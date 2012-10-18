@@ -8,17 +8,17 @@ class BaseCodec(object):
 
     encoder_options = {}
     codec_name = None
-    ffmpeg_codec_name = None
+    avconv_codec_name = None
 
     def parse_options(self, opt):
         if 'codec' not in opt or opt['codec'] != self.codec_name:
-            raise ValueError('invalid codec name')
+            raise ValueError('Invalid codec name')
         return None
 
     def _codec_specific_parse_options(self, safe):
         return safe
 
-    def _codec_specific_produce_ffmpeg_list(self, safe):
+    def _codec_specific_produce_avconv_list(self, safe):
         return []
 
     def safe_options(self, opts):
@@ -79,7 +79,7 @@ class AudioCodec(BaseCodec):
 
         safe = self._codec_specific_parse_options(safe)
 
-        optlist = ['-acodec', self.ffmpeg_codec_name]
+        optlist = ['-acodec', self.avconv_codec_name]
         if 'channels' in safe:
             optlist.extend(['-ac', str(safe['channels'])])
         if 'bitrate' in safe:
@@ -87,7 +87,7 @@ class AudioCodec(BaseCodec):
         if 'samplerate' in safe:
             optlist.extend(['-ar', str(safe['samplerate'])])
 
-        optlist.extend(self._codec_specific_produce_ffmpeg_list(safe))
+        optlist.extend(self._codec_specific_produce_avconv_list(safe))
         return optlist
 
 
@@ -219,7 +219,6 @@ class VideoCodec(BaseCodec):
 
         sw = None
         sh = None
-        aspect = None
 
         if 'src_width' in safe and 'src_height' in safe:
             sw = safe['src_width']
@@ -227,8 +226,6 @@ class VideoCodec(BaseCodec):
             if not sw or not sh:
                 sw = None
                 sh = None
-            else:
-                aspect = (1.0 * sw) / (1.0 * sh)
 
         mode = 'stretch'
         if 'mode' in safe:
@@ -250,18 +247,18 @@ class VideoCodec(BaseCodec):
         h = safe['height']
         filters = safe['aspect_filters']
 
-        optlist = ['-vcodec', self.ffmpeg_codec_name]
+        optlist = ['-vcodec', self.avconv_codec_name]
         if 'fps' in safe:
             optlist.extend(['-r', str(safe['fps'])])
         if 'bitrate' in safe:
             optlist.extend(['-b', str(safe['bitrate']) + 'k'])
         if w and h:
             optlist.extend(['-s', '%dx%d' % (w, h),
-                '-aspect', '%d:%d' % (w, h)])
+                            '-aspect', '%d:%d' % (w, h)])
         if filters:
             optlist.extend(['-vf', filters])
 
-        optlist.extend(self._codec_specific_produce_ffmpeg_list(safe))
+        optlist.extend(self._codec_specific_produce_avconv_list(safe))
         return optlist
 
 
@@ -293,7 +290,17 @@ class AudioCopyCodec(BaseCodec):
     codec_name = 'copy'
 
     def parse_options(self, opt):
-            return ['-acodec', 'copy']
+        return ['-acodec', 'copy']
+
+
+class AudioRawCodec(BaseCodec):
+    """
+    Uncompressed audio.
+    """
+    codec_name = 'rawaudio'
+
+    def parse_options(self, opt):
+        return ['-acodec', 'pcm_s16le']
 
 
 class VideoCopyCodec(BaseCodec):
@@ -303,7 +310,17 @@ class VideoCopyCodec(BaseCodec):
     codec_name = 'copy'
 
     def parse_options(self, opt):
-            return ['-vcodec', 'copy']
+        return ['-vcodec', 'copy']
+
+
+class VideoRawCodec(BaseCodec):
+    """
+    Uncompressed video.
+    """
+    codec_name = 'rawvideo'
+
+    def parse_options(self, opt):
+        return ['-vcodec', 'rawvideo']
 
 
 class VorbisCodec(AudioCodec):
@@ -311,7 +328,7 @@ class VorbisCodec(AudioCodec):
     Vorbis audio codec.
     """
     codec_name = 'vorbis'
-    ffmpeg_codec_name = 'libvorbis'
+    avconv_codec_name = 'libvorbis'
 
 
 class TheoraCodec(VideoCodec):
@@ -319,7 +336,15 @@ class TheoraCodec(VideoCodec):
     Theora video codec.
     """
     codec_name = 'theora'
-    ffmpeg_codec_name = 'libtheora'
+    avconv_codec_name = 'libtheora'
+
+
+class AMRNBCodec(AudioCodec):
+    """
+    AAC audio codec.
+    """
+    codec_name = 'amrnb'
+    avconv_codec_name = 'libopencore_amrnb'
 
 
 class AacCodec(AudioCodec):
@@ -327,10 +352,10 @@ class AacCodec(AudioCodec):
     AAC audio codec.
     """
     codec_name = 'aac'
-    ffmpeg_codec_name = 'aac'
+    avconv_codec_name = 'aac'
     aac_experimental_enable = ['-strict', 'experimental']
 
-    def _codec_specific_produce_ffmpeg_list(self, safe):
+    def _codec_specific_produce_avconv_list(self, safe):
         return self.aac_experimental_enable
 
 
@@ -339,15 +364,16 @@ class H264Codec(VideoCodec):
     H.264/AVC video codec.
     """
     codec_name = 'h264'
-    ffmpeg_codec_name = 'libx264'
+    avconv_codec_name = 'libx264'
 
-    x264_voodoo_recipe_ipod = ("-flags +loop -cmp +chroma " +
+    x264_voodoo_recipe_ipod = (
+        "-flags +loop -cmp +chroma " +
         "-partitions +parti4x4+partp8x8+partb8x8 -subq 5 -trellis 1 " +
         "-refs 1 -coder 0 -me_range 16 -g 300 -keyint_min 25 " +
         "-sc_threshold 40 -i_qfactor 0.71 -rc_eq 'blurCplx^(1-qComp)' " +
         "-qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -level 30")
 
-    def _codec_specific_produce_ffmpeg_list(self, safe):
+    def _codec_specific_produce_avconv_list(self, safe):
         return self.x264_voodoo_recipe_ipod.split(' ')
 
 
@@ -356,7 +382,7 @@ class Mp3Codec(AudioCodec):
     MP3 (MPEG layer 3) audio codec.
     """
     codec_name = 'mp3'
-    ffmpeg_codec_name = 'libmp3lame'
+    avconv_codec_name = 'libmp3lame'
 
 
 class Mp2Codec(AudioCodec):
@@ -364,7 +390,7 @@ class Mp2Codec(AudioCodec):
     MP2 (MPEG layer 2) audio codec.
     """
     codec_name = 'mp2'
-    ffmpeg_codec_name = 'mp2'
+    avconv_codec_name = 'mp2'
 
 
 class DivxCodec(VideoCodec):
@@ -372,7 +398,7 @@ class DivxCodec(VideoCodec):
     DivX video codec.
     """
     codec_name = 'divx'
-    ffmpeg_codec_name = 'mpeg4'
+    avconv_codec_name = 'mpeg4'
 
 
 class Vp8Codec(VideoCodec):
@@ -380,7 +406,7 @@ class Vp8Codec(VideoCodec):
     Google VP8 video codec.
     """
     codec_name = 'vp8'
-    ffmpeg_codec_name = 'libvpx'
+    avconv_codec_name = 'libvpx'
 
 
 class H263Codec(VideoCodec):
@@ -388,7 +414,10 @@ class H263Codec(VideoCodec):
     H.263 video codec.
     """
     codec_name = 'h263'
-    ffmpeg_codec_name = 'h263p'
+    avconv_codec_name = 'h263p'
+
+    def _codec_specific_produce_avconv_list(self, safe):
+        return '-threads', '1'
 
 
 class FlvCodec(VideoCodec):
@@ -396,14 +425,14 @@ class FlvCodec(VideoCodec):
     Flash Video codec.
     """
     codec_name = 'flv'
-    ffmpeg_codec_name = 'flv'
+    avconv_codec_name = 'flv'
 
 
 class MpegCodec(VideoCodec):
     """
     Base MPEG video codec.
     """
-    # Workaround for a bug in ffmpeg in which aspect ratio
+    # Workaround for a bug in avconv in which aspect ratio
     # is not correctly preserved, so we have to set it
     # again in vf; take care to put it *before* crop/pad, so
     # it uses the same adjusted dimensions as the codec itself
@@ -429,7 +458,7 @@ class Mpeg1Codec(MpegCodec):
     MPEG-1 video codec.
     """
     codec_name = 'mpeg1'
-    ffmpeg_codec_name = 'mpeg1video'
+    avconv_codec_name = 'mpeg1video'
 
 
 class Mpeg2Codec(MpegCodec):
@@ -437,15 +466,15 @@ class Mpeg2Codec(MpegCodec):
     MPEG-2 video codec.
     """
     codec_name = 'mpeg2'
-    ffmpeg_codec_name = 'mpeg2video'
+    avconv_codec_name = 'mpeg2video'
 
 
 audio_codec_list = [
-    AudioNullCodec, AudioCopyCodec, VorbisCodec, AacCodec, Mp3Codec, Mp2Codec
+    AudioNullCodec, AudioCopyCodec, AudioRawCodec, VorbisCodec, AacCodec, Mp3Codec, Mp2Codec, AMRNBCodec
 ]
 
 video_codec_list = [
-    VideoNullCodec, VideoCopyCodec, TheoraCodec, H264Codec,
+    VideoNullCodec, VideoCopyCodec, VideoRawCodec, TheoraCodec, H264Codec,
     DivxCodec, Vp8Codec, H263Codec, FlvCodec, Mpeg1Codec,
     Mpeg2Codec
 ]

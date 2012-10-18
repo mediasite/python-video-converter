@@ -7,7 +7,7 @@ import os.path
 from avcodecs import video_codec_list, audio_codec_list
 from formats import format_list
 
-from ffmpeg import FFMpeg, FFMpegError, FFMpegConvertError
+from avconv import Avconv
 
 
 class ConverterError(Exception):
@@ -21,32 +21,50 @@ class Converter(object):
     >>> c = Converter()
     """
 
-    def __init__(self, ffmpeg_path=None, ffprobe_path=None):
+    def __init__(self, avconv_path=None, avprobe_path=None):
         """
         Initialize a new Converter object.
         """
 
-        self.ffmpeg = FFMpeg(ffmpeg_path=ffmpeg_path,
-            ffprobe_path=ffprobe_path)
+        self.avconv = Avconv(avconv_path=avconv_path, avprobe_path=avprobe_path)
         self.video_codecs = {}
         self.audio_codecs = {}
         self.formats = {}
 
+        #self.vcodecs_name_to_avconv_name_map = {}
+        self.vcodec_names = []
+        self.vcodecs_avconv_name_to_name_map = {}
+
+        #self.acodecs_name_to_avconv_name_map = {}
+        self.acodec_names = []
+        self.acodecs_avconv_name_to_name_map = {}
+
+        self.formats_name_to_avconv_name_map = {}
+        self.formats_avconv_name_to_name_map = {}
+
         for cls in audio_codec_list:
             name = cls.codec_name
             self.audio_codecs[name] = cls
+            #self.acodecs_name_to_avconv_name_map[name] = cls.avconv_codec_name
+            self.acodec_names.append(cls.codec_name)
+            self.acodecs_avconv_name_to_name_map[cls.avconv_codec_name] = name
 
         for cls in video_codec_list:
             name = cls.codec_name
             self.video_codecs[name] = cls
+            #self.vcodecs_name_to_avconv_name_map[name] = cls.avconv_codec_name
+            self.vcodec_names.append(cls.codec_name)
+            self.vcodecs_avconv_name_to_name_map[cls.avconv_codec_name] = name
 
         for cls in format_list:
             name = cls.format_name
             self.formats[name] = cls
+            self.formats_name_to_avconv_name_map[name] = cls.avconv_format_name
+            self.formats_avconv_name_to_name_map[cls.avconv_format_name] = name
 
     def parse_options(self, opt, twopass=None):
         """
-        Parse format/codec options and prepare raw ffmpeg option list.
+        Parse format/codec options and prepare raw avconv option list.
         """
         format_options = None
         audio_options = []
@@ -149,7 +167,7 @@ class Converter(object):
         if not os.path.exists(infile):
             raise ConverterError("Source file doesn't exist: " + infile)
 
-        info = self.ffmpeg.probe(infile)
+        info = self.avconv.probe(infile)
         if info is None:
             raise ConverterError("Can't get information about source file")
 
@@ -166,27 +184,27 @@ class Converter(object):
 
         if twopass:
             optlist1 = self.parse_options(options, 1)
-            for timecode in self.ffmpeg.convert(infile, outfile, optlist1):
+            for timecode in self.avconv.convert(infile, outfile, optlist1):
                 yield int((50.0 * timecode) / info.format.duration)
 
             optlist2 = self.parse_options(options, 2)
-            for timecode in self.ffmpeg.convert(infile, outfile, optlist2):
+            for timecode in self.avconv.convert(infile, outfile, optlist2):
                 yield int(50.0 + (50.0 * timecode) / info.format.duration)
         else:
             optlist = self.parse_options(options, twopass)
-            for timecode in self.ffmpeg.convert(infile, outfile, optlist):
+            for timecode in self.avconv.convert(infile, outfile, optlist):
                 yield int((100.0 * timecode) / info.format.duration)
 
     def probe(self, fname):
         """
         Examine the media file. See the documentation of
-        converter.FFMpeg.probe() for details.
+        converter.Avconv.probe() for details.
         """
-        return self.ffmpeg.probe(fname)
+        return self.avconv.probe(fname)
 
     def thumbnail(self, fname, time, outfile, size=None):
         """
         Create a thumbnail of the media file. See the documentation of
-        converter.FFMpeg.thumbnail() for details.
+        converter.Avconv.thumbnail() for details.
         """
-        return self.ffmpeg.thumbnail(fname, time, outfile, size)
+        return self.avconv.thumbnail(fname, time, outfile, size)

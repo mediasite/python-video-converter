@@ -2,20 +2,16 @@
 
 import os.path
 import os
-import re
 import signal
 
-try:
-    from subprocess import Popen, PIPE
-except:
-    Popen = None
+from subprocess import Popen, PIPE
 
 
-class FFMpegError(Exception):
+class AvconvError(Exception):
     pass
 
 
-class FFMpegConvertError(Exception):
+class AvconvConvertError(Exception):
     pass
 
 
@@ -36,9 +32,9 @@ class MediaFormatInfo(object):
         self.duration = None
         self.filesize = None
 
-    def parse_ffprobe(self, key, val):
+    def parse_avprobe(self, key, val):
         """
-        Parse raw ffprobe output (key=value).
+        Parse raw avprobe output (key=value).
         """
         if key == 'format_name':
             self.format = val
@@ -52,8 +48,8 @@ class MediaFormatInfo(object):
             self.size = float(val)
 
     def __repr__(self):
-        return 'MediaFormatInfo(format=%s, duration=%.2f)' % (self.format,
-            self.duration)
+        return 'MediaFormatInfo(format=%s, duration=%.2f)' % \
+            (self.format, self.duration)
 
 
 class MediaStreamInfo(object):
@@ -100,9 +96,9 @@ class MediaStreamInfo(object):
         except:
             return default
 
-    def parse_ffprobe(self, key, val):
+    def parse_avprobe(self, key, val):
         """
-        Parse raw ffprobe output (key=value).
+        Parse raw avprobe output (key=value).
         """
 
         if key == 'index':
@@ -148,7 +144,7 @@ class MediaStreamInfo(object):
 
 class MediaInfo(object):
     """
-    Information about media object, as parsed by ffprobe.
+    Information about media object, as parsed by avprobe.
     The attributes are:
       * format - a MediaFormatInfo object
       * streams - a list of MediaStreamInfo objects
@@ -158,9 +154,9 @@ class MediaInfo(object):
         self.format = MediaFormatInfo()
         self.streams = []
 
-    def parse_ffprobe(self, raw):
+    def parse_avprobe(self, raw):
         """
-        Parse raw ffprobe output.
+        Parse raw avprobe output.
         """
         in_format = False
         current_stream = None
@@ -184,13 +180,12 @@ class MediaInfo(object):
                 k = k.strip()
                 v = v.strip()
                 if current_stream:
-                    current_stream.parse_ffprobe(k, v)
+                    current_stream.parse_avprobe(k, v)
                 elif in_format:
-                    self.format.parse_ffprobe(k, v)
+                    self.format.parse_avprobe(k, v)
 
     def __repr__(self):
-        return 'MediaInfo(format=%s, streams=%s)' % (repr(self.format),
-            repr(self.streams))
+        return 'MediaInfo(format=%s, streams=%s)' % (repr(self.format), repr(self.streams))
 
     @property
     def video(self):
@@ -213,18 +208,18 @@ class MediaInfo(object):
         return None
 
 
-class FFMpeg(object):
+class Avconv(object):
     """
-    FFMPeg wrapper object, takes care of calling the ffmpeg binaries,
+    Avconv wrapper object, takes care of calling the avconv binaries,
     passing options and parsing the output.
 
-    >>> f = FFMpeg()
+    >>> f = Avconv()
     """
 
-    def __init__(self, ffmpeg_path=None, ffprobe_path=None):
+    def __init__(self, avconv_path=None, avprobe_path=None):
         """
-        Initialize a new FFMpeg wrapper object. Optional parameters specify
-        the paths to ffmpeg and ffprobe utilities.
+        Initialize a new Avconv wrapper object. Optional parameters specify
+        the paths to avconv and avprobe utilities.
         """
 
         def which(name):
@@ -235,36 +230,32 @@ class FFMpeg(object):
                     return fpath
             return None
 
-        if ffmpeg_path is None:
-            ffmpeg_path = 'ffmpeg'
+        if avconv_path is None:
+            avconv_path = 'avconv'
 
-        if ffprobe_path is None:
-            ffprobe_path = 'ffprobe'
+        if avprobe_path is None:
+            avprobe_path = 'avprobe'
 
-        if '/' not in ffmpeg_path:
-            ffmpeg_path = which(ffmpeg_path) or ffmpeg_path
-        if '/' not in ffprobe_path:
-            ffprobe_path = which(ffprobe_path) or ffprobe_path
+        if '/' not in avconv_path:
+            avconv_path = which(avconv_path) or avconv_path
+        if '/' not in avprobe_path:
+            avprobe_path = which(avprobe_path) or avprobe_path
 
-        self.ffmpeg_path = ffmpeg_path
-        self.ffprobe_path = ffprobe_path
+        self.avconv_path = avconv_path
+        self.avprobe_path = avprobe_path
 
-        if not os.path.exists(self.ffmpeg_path):
-            raise FFMpegError("ffmpeg binary not found: " + self.ffmpeg_path)
+        if not os.path.exists(self.avconv_path):
+            raise AvconvError("avconv binary not found: " + self.avconv_path)
 
-        if not os.path.exists(self.ffprobe_path):
-            raise FFMpegError("ffprobe binary not found: " + self.ffprobe_path)
+        if not os.path.exists(self.avprobe_path):
+            raise AvconvError("avprobe binary not found: " + self.avprobe_path)
 
     @staticmethod
-    def _spawn(cmds):
-        if Popen:
-            p = Popen(cmds, shell=False,
-                stdin=PIPE, stdout=PIPE, stderr=PIPE,
-                close_fds=True)
-            return (p.stdout, p.stderr)
-        else:
-            pin, pout, perr = os.popen3(cmds)
-            return (pout, perr)
+    def _spawn(cmds, shell=False):
+        p = Popen(cmds, shell=shell,
+                  stdin=PIPE, stdout=PIPE, stderr=PIPE,
+                  close_fds=True)
+        return p
 
     def probe(self, fname):
         """
@@ -294,21 +285,58 @@ class FFMpeg(object):
 
         info = MediaInfo()
 
-        fd, _ = self._spawn([self.ffprobe_path,
-            '-show_format', '-show_streams', fname])
+        p = self._spawn([self.avprobe_path, '-show_format', '-show_streams', fname])
+        fd, _ = p.stdout, p.stderr
         raw = fd.read()
-
-        info.parse_ffprobe(raw)
+        
+        info.parse_avprobe(raw)
 
         if not info.format.format and len(info.streams) == 0:
             return None
 
         return info
 
+    def run(self, cmds, shell=False, infile=None):
+        def on_sigalrm(*args):
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+            raise Exception('Timed out while waiting for avconv')
+
+        signal.signal(signal.SIGALRM, on_sigalrm)
+
+        try:
+            p = self._spawn(cmds, shell=shell)
+            _, fd = p.stdout, p.stderr
+        except OSError:
+            raise AvconvError('Error while calling avconv binary')
+
+        buf = ''
+        total_output = ''
+
+        while True:
+            signal.alarm(10)
+            ret = fd.read(10)
+            signal.alarm(0)
+
+            if not ret:
+                break
+
+            total_output += ret
+            buf += ret
+            if '\r' in buf:
+                yield True
+
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)
+        p.wait()
+
+        if total_output == '':
+            raise AvconvError('Error while calling avconv binary')
+        elif p.returncode != 0:
+            raise AvconvConvertError('Encoding error' + total_output)
+
     def convert(self, infile, outfile, opts):
         """
         Convert the source media (infile) according to specified options
-        (a list of ffmpeg switches as strings) and save it to outfile.
+        (a list of avconv switches as strings) and save it to outfile.
 
         Convert returns a generator that needs to be iterated to drive the
         conversion process. The generator will periodically yield timecode
@@ -322,67 +350,12 @@ class FFMpeg(object):
 
         """
         if not os.path.exists(infile):
-            raise FFMpegError("Input file doesn't exist: " + infile)
+            raise AvconvError("Input file doesn't exist: " + infile)
 
-        cmds = [self.ffmpeg_path, '-i', infile]
+        cmds = [self.avconv_path, '-v', 'debug', '-i', infile]
         cmds.extend(opts)
         cmds.extend(['-y', outfile])
-
-        def on_sigalrm(*args):
-            signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            raise Exception('timed out while waiting for ffmpeg')
-
-        signal.signal(signal.SIGALRM, on_sigalrm)
-
-        try:
-            _, fd = self._spawn(cmds)
-        except OSError:
-            raise FFMpegError('Error while calling ffmpeg binary')
-
-        yielded = False
-        buf = ''
-        total_output = ''
-        pat = re.compile(r'time=([0-9.:]+) ')
-        while True:
-            signal.alarm(10)
-            ret = fd.read(10)
-            signal.alarm(0)
-
-            if not ret:
-                break
-
-            total_output += ret
-            buf += ret
-            if '\r' in buf:
-                line, buf = buf.split('\r', 1)
-
-                tmp = pat.findall(line)
-                if len(tmp) == 1:
-                    timespec = tmp[0]
-                    if ':' in timespec:
-                        parts = timespec.split(':')
-                        timecode = 0
-                        for part in timespec.split(':'):
-                            timecode = 60 * timecode + float(part)
-                    else:
-                        timecode = float(tmp[0])
-                    yielded = True
-                    yield timecode
-
-        signal.signal(signal.SIGALRM, signal.SIG_DFL)
-
-        if total_output == '':
-            raise FFMpegError('Error while calling ffmpeg binary')
-        else:
-            if '\n' in total_output:
-                line = total_output.split('\n')[-2]
-                if line.startswith(infile + ': '):
-                    err = line[len(infile) + 2:]
-                    raise FFMpegConvertError('Encoding error: ' + err)
-                elif line.startswith('Error while '):
-                    raise FFMpegConvertError('Encoding error: ' + line)
-                elif not yielded:
-                    raise FFMpegConvertError('Unknown ffmpeg error')
+        return self.run(cmds, infile=infile)
 
     def thumbnail(self, fname, time, outfile, size=None):
         """
@@ -396,20 +369,22 @@ class FFMpeg(object):
         if not os.path.exists(fname):
             raise IOError('No such file: ' + fname)
 
-        cmds = [self.ffmpeg_path,
-            '-ss', str(time),
-            '-i', fname,
-            '-y', '-an', '-f', 'image2', '-sameq', '-vframes', '1']
+        cmds = [self.avconv_path,
+                '-ss', str(time),
+                '-i', fname,
+                '-y', '-an', '-f', 'image2', '-sameq', '-vframes', '1']
 
         if size:
             cmds.extend(['-s', str(size)])
 
         cmds.append(outfile)
 
-        _, fd = self._spawn(cmds)
+        p = self._spawn(cmds)
+        _, fd = p.stdout, p.stderr
+
         output = fd.read()
         if output == '':
-            raise FFMpegError('Error while calling ffmpeg binary')
+            raise AvconvError('Error while calling avconv binary')
 
         if not os.path.exists(outfile):
-            raise FFMpegError('Error creating thumbnail')
+            raise AvconvError('Error creating thumbnail')

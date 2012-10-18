@@ -9,12 +9,20 @@ class BaseFormat(object):
     """
 
     format_name = None
-    ffmpeg_format_name = None
+    avconv_format_name = None
 
     def parse_options(self, opt):
         if 'format' not in opt or opt.get('format') != self.format_name:
             raise ValueError('invalid Format format')
-        return ['-f', self.ffmpeg_format_name]
+        return ['-f', self.avconv_format_name]
+
+
+class _3GPFormat(BaseFormat):
+    """
+    3gp container format.
+    """
+    format_name = '3gp'
+    avconv_format_name = '3gp'
 
 
 class OggFormat(BaseFormat):
@@ -22,7 +30,7 @@ class OggFormat(BaseFormat):
     Ogg container format, mostly used with Vorbis and Theora.
     """
     format_name = 'ogg'
-    ffmpeg_format_name = 'ogg'
+    avconv_format_name = 'ogg'
 
 
 class AviFormat(BaseFormat):
@@ -30,7 +38,7 @@ class AviFormat(BaseFormat):
     Avi container format, often used vith DivX video.
     """
     format_name = 'avi'
-    ffmpeg_format_name = 'avi'
+    avconv_format_name = 'avi'
 
 
 class MkvFormat(BaseFormat):
@@ -38,7 +46,7 @@ class MkvFormat(BaseFormat):
     Matroska format, often used with H.264 video.
     """
     format_name = 'mkv'
-    ffmpeg_format_name = 'matroska'
+    avconv_format_name = 'matroska'
 
 
 class WebmFormat(BaseFormat):
@@ -47,7 +55,7 @@ class WebmFormat(BaseFormat):
     VP8 for video and Vorbis for audio content.
     """
     format_name = 'webm'
-    ffmpeg_format_name = 'webm'
+    avconv_format_name = 'webm'
 
 
 class FlvFormat(BaseFormat):
@@ -55,7 +63,7 @@ class FlvFormat(BaseFormat):
     Flash Video container format.
     """
     format_name = 'flv'
-    ffmpeg_format_name = 'flv'
+    avconv_format_name = 'flv'
 
 
 class MovFormat(BaseFormat):
@@ -64,7 +72,7 @@ class MovFormat(BaseFormat):
     content, often for mobile platforms.
     """
     format_name = 'mov'
-    ffmpeg_format_name = 'mov'
+    avconv_format_name = 'mov'
 
 
 class Mp4Format(BaseFormat):
@@ -73,7 +81,7 @@ class Mp4Format(BaseFormat):
     video content.
     """
     format_name = 'mp4'
-    ffmpeg_format_name = 'mp4'
+    avconv_format_name = 'mp4'
 
 
 class MpegFormat(BaseFormat):
@@ -81,10 +89,10 @@ class MpegFormat(BaseFormat):
     MPEG(TS) container, used mainly for MPEG 1/2 video codecs.
     """
     format_name = 'mpg'
-    ffmpeg_format_name = 'mpegts'
+    avconv_format_name = 'mpegts'
 
 
 format_list = [
     OggFormat, AviFormat, MkvFormat, WebmFormat, FlvFormat,
-    MovFormat, Mp4Format, MpegFormat
+    MovFormat, Mp4Format, MpegFormat, _3GPFormat
 ]

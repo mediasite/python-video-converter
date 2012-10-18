@@ -7,12 +7,11 @@ sys.path.append('../')
 import unittest
 import os
 import os.path
-import datetime
 
-from converter import ffmpeg, formats, avcodecs, Converter, ConverterError
+from converter import avconv, formats, avcodecs, Converter, ConverterError
 
 
-class TestFFMpeg(unittest.TestCase):
+class TestAvconv(unittest.TestCase):
 
     def setUp(self):
         pass
@@ -32,11 +31,11 @@ class TestFFMpeg(unittest.TestCase):
         if os.path.exists(f):
             os.unlink(f)
 
-    def test_ffmpeg_probe(self):
-        self.assertRaisesSpecific(ffmpeg.FFMpegError, ffmpeg.FFMpeg,
-            ffmpeg_path='/foo', ffprobe_path='/bar')
+    def test_avconv_probe(self):
+        self.assertRaisesSpecific(avconv.AvconvError, avconv.Avconv,
+            avconv_path='/foo', avprobe_path='/bar')
 
-        f = ffmpeg.FFMpeg()
+        f = avconv.Avconv()
 
         self.assertEqual(None, f.probe('/nonexistent'))
         self.assertEqual(None, f.probe('/dev/null'))
@@ -64,16 +63,16 @@ class TestFFMpeg(unittest.TestCase):
         self.assertEqual(repr(info),
             'MediaInfo(format=MediaFormatInfo(format=ogg, duration=33.00), streams=[MediaStreamInfo(type=video, codec=theora, width=720, height=400, fps=25.0), MediaStreamInfo(type=audio, codec=vorbis, channels=2, rate=48000)])')
 
-    def test_ffmpeg_convert(self):
-        f = ffmpeg.FFMpeg()
+    def test_avconv_convert(self):
+        f = avconv.Avconv()
 
         def consume(fn, *args, **kwargs):
             return list(fn(*args, **kwargs))
 
-        self.assertRaisesSpecific(ffmpeg.FFMpegError, consume,
+        self.assertRaisesSpecific(avconv.AvconvError, consume,
             f.convert, '/nonexistent', '/tmp/output.ogg', [])
 
-        self.assertRaisesSpecific(ffmpeg.FFMpegConvertError, consume,
+        self.assertRaisesSpecific(avconv.AvconvConvertError, consume,
             f.convert, '/etc/passwd', '/tmp/output.ogg', [])
 
         info = f.probe('test1.ogg')
@@ -104,8 +103,8 @@ class TestFFMpeg(unittest.TestCase):
         self.assertEqual(1, info.audio.audio_channels)
         self.assertEqual(11025, info.audio.audio_samplerate)
 
-    def test_ffmpeg_thumbnail(self):
-        f = ffmpeg.FFMpeg()
+    def test_avconv_thumbnail(self):
+        f = avconv.Avconv()
         thumb = '/tmp/shot.png'
 
         self.assertRaisesSpecific(IOError, f.thumbnail, '/nonexistent', 10, thumb)
@@ -115,7 +114,7 @@ class TestFFMpeg(unittest.TestCase):
         self.assertTrue(os.path.exists(thumb))
 
         self.ensure_notexist(thumb)
-        self.assertRaisesSpecific(ffmpeg.FFMpegError, f.thumbnail, 'test1.ogg', 34, thumb)
+        self.assertRaisesSpecific(avconv.AvconvError, f.thumbnail, 'test1.ogg', 34, thumb)
         self.assertFalse(os.path.exists(thumb))
 
     def test_formats(self):
@@ -133,7 +132,7 @@ class TestFFMpeg(unittest.TestCase):
 
         c = avcodecs.AudioCodec()
         c.codec_name = 'doctest'
-        c.ffmpeg_codec_name = 'doctest'
+        c.avconv_codec_name = 'doctest'
 
         self.assertEqual(['-acodec', 'doctest'],
             c.parse_options({'codec': 'doctest', 'channels': 0, 'bitrate': 0, 'samplerate': 0}))
@@ -143,7 +142,7 @@ class TestFFMpeg(unittest.TestCase):
 
         c = avcodecs.VideoCodec()
         c.codec_name = 'doctest'
-        c.ffmpeg_codec_name = 'doctest'
+        c.avconv_codec_name = 'doctest'
 
         self.assertEqual(['-vcodec', 'doctest'],
             c.parse_options({'codec': 'doctest', 'fps': 0, 'bitrate': 0, 'width': 0, 'height': '480' }))
