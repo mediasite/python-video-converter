@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-import os.path
-import os
+import re
 import signal
+import os
+import os.path
 
 from subprocess import Popen, PIPE
 
@@ -153,6 +154,8 @@ class MediaInfo(object):
     def __init__(self):
         self.format = MediaFormatInfo()
         self.streams = []
+        self.audio_bitrate = None
+        self.video_bitrate = None
 
     def parse_avprobe(self, raw):
         """
@@ -163,8 +166,15 @@ class MediaInfo(object):
 
         for line in raw.split('\n'):
             line = line.strip()
+            audio_bitrate_match = re.match(r'Stream.*Audio.*?(\d+) kb/s.*', line)
+            video_bitrate_match = re.match(r'Stream.*Video.*?(\d+) kb/s.*', line)
+
             if line == '':
                 continue
+            elif audio_bitrate_match:
+                self.audio_bitrate = int(audio_bitrate_match.group(1))
+            elif video_bitrate_match:
+                self.video_bitrate = int(video_bitrate_match.group(1))
             elif line == '[STREAM]':
                 current_stream = MediaStreamInfo()
             elif line == '[/STREAM]':
@@ -287,7 +297,7 @@ class Avconv(object):
 
         p = self._spawn([self.avprobe_path, '-show_format', '-show_streams', fname])
         fd, _ = p.stdout, p.stderr
-        raw = fd.read()
+        raw = _.read() + fd.read()
         
         info.parse_avprobe(raw)
 
@@ -297,12 +307,6 @@ class Avconv(object):
         return info
 
     def run(self, cmds, shell=False, infile=None):
-        def on_sigalrm(*args):
-            signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            raise Exception('Timed out while waiting for avconv')
-
-        signal.signal(signal.SIGALRM, on_sigalrm)
-
         try:
             p = self._spawn(cmds, shell=shell)
             _, fd = p.stdout, p.stderr
@@ -313,9 +317,7 @@ class Avconv(object):
         total_output = ''
 
         while True:
-            signal.alarm(10)
             ret = fd.read(10)
-            signal.alarm(0)
 
             if not ret:
                 break
@@ -325,7 +327,6 @@ class Avconv(object):
             if '\r' in buf:
                 yield True
 
-        signal.signal(signal.SIGALRM, signal.SIG_DFL)
         p.wait()
 
         if total_output == '':

@@ -25,42 +25,47 @@ class Converter(object):
         """
         Initialize a new Converter object.
         """
-
         self.avconv = Avconv(avconv_path=avconv_path, avprobe_path=avprobe_path)
         self.video_codecs = {}
         self.audio_codecs = {}
         self.formats = {}
 
-        #self.vcodecs_name_to_avconv_name_map = {}
-        self.vcodec_names = []
         self.vcodecs_avconv_name_to_name_map = {}
-
-        #self.acodecs_name_to_avconv_name_map = {}
-        self.acodec_names = []
         self.acodecs_avconv_name_to_name_map = {}
-
-        self.formats_name_to_avconv_name_map = {}
         self.formats_avconv_name_to_name_map = {}
 
         for cls in audio_codec_list:
             name = cls.codec_name
             self.audio_codecs[name] = cls
-            #self.acodecs_name_to_avconv_name_map[name] = cls.avconv_codec_name
-            self.acodec_names.append(cls.codec_name)
             self.acodecs_avconv_name_to_name_map[cls.avconv_codec_name] = name
 
         for cls in video_codec_list:
             name = cls.codec_name
             self.video_codecs[name] = cls
-            #self.vcodecs_name_to_avconv_name_map[name] = cls.avconv_codec_name
-            self.vcodec_names.append(cls.codec_name)
             self.vcodecs_avconv_name_to_name_map[cls.avconv_codec_name] = name
 
         for cls in format_list:
             name = cls.format_name
             self.formats[name] = cls
-            self.formats_name_to_avconv_name_map[name] = cls.avconv_format_name
             self.formats_avconv_name_to_name_map[cls.avconv_format_name] = name
+
+    def get_avconv_name_from_acodec(self, acodec):
+        return self.audio_codecs[acodec].avconv_codec_name
+
+    def get_avconv_name_from_vcodec(self, vcodec):
+        return self.video_codecs[vcodec].avconv_codec_name
+
+    def get_avconv_name_from_format(self, format):
+        return self.formats[format].format_name
+
+    def get_acodec_from_avconv_name(self, acodec):
+        return self.acodecs_avconv_name_to_name_map.get(acodec, acodec)
+    
+    def get_vcodec_from_avconv_name(self, vcodec):
+        return self.vcodecs_avconv_name_to_name_map.get(vcodec, vcodec)
+    
+    def get_format_from_avconv_name(self, format):
+        return self.formats_avconv_name_to_name_map.get(format, format)
 
     def parse_options(self, opt, twopass=None):
         """

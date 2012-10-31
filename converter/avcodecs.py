@@ -123,7 +123,7 @@ class VideoCodec(BaseCodec):
     encoder_options = {
         'codec': str,
         'bitrate': int,
-        'fps': int,
+        'fps': float,
         'width': int,
         'height': int,
         'mode': str,
@@ -339,12 +339,36 @@ class TheoraCodec(VideoCodec):
     avconv_codec_name = 'libtheora'
 
 
-class AMRNBCodec(AudioCodec):
+class AmrnbCodec(AudioCodec):
     """
-    AAC audio codec.
+    AMRNB audio codec.
     """
     codec_name = 'amrnb'
     avconv_codec_name = 'libopencore_amrnb'
+
+
+class AdpcmSwfCodec(AudioCodec):
+    """
+    adpcm_swf audio codec.
+    """
+    codec_name = 'adpcm_swf'
+    avconv_codec_name = 'adpcm_swf'
+
+
+class Wmav2Codec(AudioCodec):
+    """
+    wmav2 audio codec.
+    """
+    codec_name = 'wmav2'
+    avconv_codec_name = 'wmav2'
+
+
+class AC3Codec(AudioCodec):
+    """
+    AC3 audio codec.
+    """
+    codec_name = 'ac3'
+    avconv_codec_name = 'ac3'
 
 
 class AacCodec(AudioCodec):
@@ -470,7 +494,8 @@ class Mpeg2Codec(MpegCodec):
 
 
 audio_codec_list = [
-    AudioNullCodec, AudioCopyCodec, AudioRawCodec, VorbisCodec, AacCodec, Mp3Codec, Mp2Codec, AMRNBCodec
+    AudioNullCodec, AudioCopyCodec, AudioRawCodec, VorbisCodec, AacCodec, Mp3Codec, Mp2Codec,
+    AmrnbCodec, AC3Codec, AdpcmSwfCodec, Wmav2Codec
 ]
 
 video_codec_list = [

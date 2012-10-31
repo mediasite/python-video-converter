@@ -84,15 +84,22 @@ class Mp4Format(BaseFormat):
     avconv_format_name = 'mp4'
 
 
-class MpegFormat(BaseFormat):
+class MpgFormat(BaseFormat):
     """
     MPEG(TS) container, used mainly for MPEG 1/2 video codecs.
     """
     format_name = 'mpg'
     avconv_format_name = 'mpegts'
 
+class MpegFormat(BaseFormat):
+    """
+    MPEG(TS) container, used mainly for MPEG 1/2 video codecs.
+    """
+    format_name = 'mpeg'
+    avconv_format_name = 'mpegts'
+
 
 format_list = [
     OggFormat, AviFormat, MkvFormat, WebmFormat, FlvFormat,
-    MovFormat, Mp4Format, MpegFormat, _3GPFormat
+    MovFormat, Mp4Format, MpgFormat, MpegFormat, _3GPFormat
 ]
